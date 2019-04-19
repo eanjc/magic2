@@ -6,7 +6,7 @@ import math
 import pyltp
 import os
 from pyltp import Segmentor
-import data.TextRank
+import code.TextRank
 
 # 定义映射函数
 def sigmoid(x):
@@ -73,7 +73,7 @@ f=codecs.open("coreEntityEmotion_test_stage1.txt",'r','utf-8')
 fout=codecs.open("predict_test3_pyltp_v3_2.txt",'w','utf-8')
 
 #加载TextRank
-trDemo = data.TextRank.TextRank()
+trDemo = code.TextRank.TextRank()
 
 # 分析过程
 i = 0
