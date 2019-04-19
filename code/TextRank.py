@@ -1,19 +1,26 @@
 import os
 import math
-LTP_DATA_DIR = 'D:\Souhu\ltp_data_v3.4.0\ltp_data_v3.4.0'  # ltp模型目录的路径
-pos_model_path = os.path.join(LTP_DATA_DIR, 'pos.model')  # 词性标注模型路径，模型名称为`pos.model`
+
 
 from pyltp import Postagger
-postagger = Postagger() # 初始化实例
-postagger.load(pos_model_path)  # 加载模型
+
 # 重写TextRank算法
 class TextRank(object):
 
     def __init__(self,span=5):
         self.span=span
+        self.LTP_DATA_DIR = 'D:\Souhu\ltp_data_v3.4.0\ltp_data_v3.4.0'  # ltp模型目录的路径
+        self.pos_model_path = os.path.join(self.LTP_DATA_DIR, 'pos.model')  # 词性标注模型路径，模型名称为`pos.model`
+        self.postagger = Postagger()  # 初始化实例
+        self.postagger.load(self.pos_model_path)  # 加载模型
+        self.diff_limit=0.00001
+        self.max_diff=1
+        self.max_iter=100
+        self.iter_times=0
+        self.d=0.85
 
     def textrank(self,wordList):
-        pos=postagger.postag(wordList)
+        pos=self.postagger.postag(wordList)
         pos=list(pos)
         sp={'j','n','nh','ni','nl','ns','nt','nz','ws'}
         nWords=[]
@@ -78,7 +85,7 @@ class TextRank(object):
 
 
     def standardScoreTextrank(self,wordList):
-        pos=postagger.postag(wordList)
+        pos=self.postagger.postag(wordList)
         pos=list(pos)
         sp={'j','n','nh','ni','nl','ns','nt','nz','ws'}
         nWords=[]
