@@ -6,6 +6,7 @@ import math
 import pyltp
 import os
 from pyltp import Segmentor
+import data.TextRank
 
 '''
 请替换jieba的默认字典 可能需要删除cache
@@ -18,6 +19,11 @@ from pyltp import Segmentor
 kickout为剔除非法标点 但是这可能导致实体漏识别
 inTitleRank 采用tanh(ax)函数将[0,inf]映射到[0,1] a为可调参数
 '''
+# 定义映射函数
+def sigmoid(x):
+    x=float(x)
+    y = 1 / (1 + math.exp((-x)))
+    return y
 # 加载并设置pyltp
 LTP_DATA_DIR='D:\Souhu\ltp_data_v3.4.0\ltp_data_v3.4.0'
 cws_model_path=os.path.join(LTP_DATA_DIR,'cws.model')
@@ -71,7 +77,9 @@ nerDict=loadPreTrainEntityDict('lexiconAndNerDictWithInfo.txt')
 f=codecs.open("coreEntityEmotion_train.txt",'r','utf-8')
 
 # 设置输出文件
-fout=codecs.open("entityOutPut_originCut-pyltp_5001.txt",'w','utf-8')
+fout=codecs.open("entityOutPut_originCut-pyltp_5004.txt",'w','utf-8')
+
+
 
 # 分析过程
 i = 0
@@ -103,7 +111,7 @@ for rawline in f.readlines():
     lineWordsDic = {}
     # 分词
     words = segmentor.segment(content)
-    # wordsForTR=list(words)
+    wordsForTR=list(words)
     # 总词数
     wordNum = 0
     # 创建内容分词输出行
@@ -129,17 +137,18 @@ for rawline in f.readlines():
     # TFIDF 评分
     for w in lineWordsDic:
         if (w  in idfDict):
-            idf = idfDict[w]
+            idf = idfDict[w]*(1+sigmoid(idfDict[w]-6))
         else:
             idfDict[w]=idf =1
+            if len(w)>3:
+                idfDict[w] = idf = 6
         tfidf[w]=(lineWordsDic[w]/wordNum)*idf  #MJ：wordNum不用除吧，每个词同除一个整数？idf下次来看看你怎么统计的。P
     # TextRank评分
-    trdemo=jieba.analyse.TextRank()
-    trdemo.span=8
     """
     这里默认已经修改过jieba的TextRank方法（未完成）或者重写。如果使用的是原始的jieba.textrank 请将alreadyCutted参数删除
     """
-    textRank = trdemo.textrank(content, topK=wordNum, withWeight=True,allowPOS=('ns', 'n', 'nr', 'nt', 'nz', 'vn', 'v'), alreadyCutted=False)
+
+    textRank = trDemo.standardScoreTextrank(wordsForTR)
     # textRank = trdemo.textrank(wordsForTR, topK=wordNum, withWeight=True,allowPOS=('ns', 'n', 'nr','nt','nz','vn', 'v'),alreadyCutted=True)   #MJ:topK,allowPOS,span这几个参数有优化的空间。建议把各个模块独立出来，调用函数。比如我想快速迭代几轮，那么可以选择先不运行textrank的模块。之后组织代码的时候可以考虑一下后续的变动问题。
     # 创建TR评分词典
     trDict = {}

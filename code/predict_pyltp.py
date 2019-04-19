@@ -6,6 +6,13 @@ import math
 import pyltp
 import os
 from pyltp import Segmentor
+import data.TextRank
+
+# 定义映射函数
+def sigmoid(x):
+    x=float(x)
+    y = 1 / (1 + math.exp((-x)))
+    return y
 
 # 加载并设置pyltp
 LTP_DATA_DIR='D:\Souhu\ltp_data_v3.4.0\ltp_data_v3.4.0'
@@ -63,7 +70,10 @@ nerDict=loadPreTrainEntityDict('lexiconAndNerDictWithInfo.txt')
 f=codecs.open("coreEntityEmotion_test_stage1.txt",'r','utf-8')
 
 # 设置输出文件
-fout=codecs.open("predict_test3_pyltp_v2_1.txt",'w','utf-8')
+fout=codecs.open("predict_test3_pyltp_v3_2.txt",'w','utf-8')
+
+#加载TextRank
+trDemo = data.TextRank.TextRank()
 
 # 分析过程
 i = 0
@@ -98,6 +108,7 @@ for rawline in f.readlines():
     lineWordsDic = {}
     # 分词
     words = segmentor.segment(content)
+    wordsForTR = list(words)
     # 总词数
     wordNum = 0
     # 创建内容分词输出行
@@ -123,13 +134,14 @@ for rawline in f.readlines():
     # TFIDF 评分
     for w in lineWordsDic:
         if (w  in idfDict):
-            idf = idfDict[w]
+            idf = idfDict[w]*(1+sigmoid(idfDict[w]-6))
         else:
             idfDict[w]=idf =1
+            if len(w)>3:
+                idfDict[w] = idf = 6
         tfidf[w]=(lineWordsDic[w]/wordNum)*idf  #MJ：wordNum不用除吧，每个词同除一个整数？idf下次来看看你怎么统计的。P
     # TextRank评分
-    textRank = jieba.analyse.textrank(content, topK=wordNum, withWeight=True)   #MJ:topK,allowPOS,span这几个参数有优化的空间。建议把各个模块独立出来，调用函数。比如我想快速迭代几轮，那么可以选择先不运行textrank的模块。之后组织代码的时候可以考虑一下后续的变动问题。
-    # 创建TR评分词典
+    textRank = trDemo.standardScoreTextrank(wordsForTR)    # 创建TR评分词典
     trDict = {}
     for l in textRank:
         trDict[l[0]]=l[1]
@@ -149,6 +161,8 @@ for rawline in f.readlines():
     # 创建总分词典
     totalScore = {}
     # 评分并记录
+    # 附加判断
+    addition=0
     for k in tfidf:
         partOfSpeechRank = 0
         inTitleRank = 0
@@ -168,8 +182,8 @@ for rawline in f.readlines():
             if w in k:
                 if w not in idfDict:
                     idfDict[w]=1
-                inTitleRank+=1+idfDict[w]
-        inTitleRank=math.tanh(0.2*inTitleRank)
+                inTitleRank+=1+idfDict[w]*1.2
+        inTitleRank=math.tanh(0.15*inTitleRank)
         itlDict[k]=inTitleRank
         if k in nerDict:
             tp=nerDict[k]
@@ -184,6 +198,7 @@ for rawline in f.readlines():
                 partOfSpeechRank = posDict[k] = 0.35
             else:
                 partOfSpeechRank = posDict[k] = 0
+
         totalScore[k] = rank['tfidf'] * standardTfidf[k] + rank['tr']  * tr + rank['it']  * inTitleRank + rank['pos']  * partOfSpeechRank
     # 对总分排序
     sortedScore = sorted(totalScore.items(), key=lambda x: x[1], reverse=True)
