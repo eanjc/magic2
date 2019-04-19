@@ -6,7 +6,7 @@ import math
 import pyltp
 import os
 from pyltp import Segmentor
-import data.TextRank
+import code.TextRank
 
 '''
 请替换jieba的默认字典 可能需要删除cache
@@ -78,7 +78,8 @@ f=codecs.open("coreEntityEmotion_train.txt",'r','utf-8')
 
 # 设置输出文件
 fout=codecs.open("entityOutPut_originCut-pyltp_5004.txt",'w','utf-8')
-
+#加载TextRank
+trDemo = code.TextRank.TextRank()
 
 
 # 分析过程
