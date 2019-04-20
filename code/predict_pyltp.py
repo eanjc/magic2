@@ -6,7 +6,7 @@ import math
 import pyltp
 import os
 from pyltp import Segmentor
-import code.TextRank
+import data.TextRank
 
 # 定义映射函数
 def sigmoid(x):
@@ -19,7 +19,7 @@ LTP_DATA_DIR='D:\Souhu\ltp_data_v3.4.0\ltp_data_v3.4.0'
 cws_model_path=os.path.join(LTP_DATA_DIR,'cws.model')
 segmentor=Segmentor()
 # segmentor.load(cws_model_path)
-segmentor.load_with_lexicon(cws_model_path, 'lexiconWithNerDict.txt')
+segmentor.load_with_lexicon(cws_model_path, 'ExDictForCut_without_JiebaDefault.txt')
 
 # 评价分数的比例
 rank={'tfidf':0.4,'tr':0.25,'it':0.2,'pos':0.15}
@@ -61,6 +61,20 @@ def loadPreTrainEntityDict(filename):
         dic[info[0]]=int(info[1])
     return dic
 
+# 加载pyltp中的ner名词
+def loadNerDictFromPyltp(filename):
+    dic={}
+    f=codecs.open(filename, 'r', 'utf-8')
+    for line in f.readlines():
+        info=line.strip().split(" ")
+        if len(info)<3:
+            continue
+        if len(info[0])>1 and info[2]=='is_ner':
+            dic[info[0]]=info[1]
+    return dic
+
+nerInPyltp=  loadNerDictFromPyltp('pyltp_savebox.txt')
+
 partOfSpeechDict=loadWordsPartOfSpeech("spdict.txt")
 nerDict=loadPreTrainEntityDict('lexiconAndNerDictWithInfo.txt')
 
@@ -70,12 +84,13 @@ nerDict=loadPreTrainEntityDict('lexiconAndNerDictWithInfo.txt')
 f=codecs.open("coreEntityEmotion_test_stage1.txt",'r','utf-8')
 
 # 设置输出文件
-fout=codecs.open("predict_test3_pyltp_v3_2.txt",'w','utf-8')
+fout=codecs.open("predict_test3_pyltp_v3_3.txt",'w','utf-8')
 
 #加载TextRank
-trDemo = code.TextRank.TextRank()
+trDemo = data.TextRank.TextRank()
 
 # 分析过程
+print ('Start Calculating Score.')
 i = 0
 for rawline in f.readlines():
     # 按行分析
@@ -188,16 +203,22 @@ for rawline in f.readlines():
         if k in nerDict:
             tp=nerDict[k]
             if tp==3:
-                partOfSpeechRank=posDict[k]=1
+                partOfSpeechRank=posDict[k]=0.9
             if tp==2:
                 partOfSpeechRank = posDict[k] = 0.5
             if tp==1:
-                partOfSpeechRank = posDict[k] = 0.8
+                partOfSpeechRank = posDict[k] = 0.7
         else:
             if k in partOfSpeechDict and partOfSpeechDict[k] in sp:
                 partOfSpeechRank = posDict[k] = 0.35
             else:
                 partOfSpeechRank = posDict[k] = 0
+        if k in nerInPyltp:
+                if partOfSpeechRank+0.25>1:
+                    partOfSpeechRank= posDict[k]=1
+                else:
+                    partOfSpeechRank += 0.25
+                    posDict[k]=partOfSpeechRank
 
         totalScore[k] = rank['tfidf'] * standardTfidf[k] + rank['tr']  * tr + rank['it']  * inTitleRank + rank['pos']  * partOfSpeechRank
     # 对总分排序
