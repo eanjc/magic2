@@ -91,7 +91,9 @@ nerDict=loadPreTrainEntityDict('lexiconAndNerDictWithInfo.txt')
 f=codecs.open("coreEntityEmotion_train.txt",'r','utf-8')
 
 # 设置输出文件
-fout=codecs.open("entityOutPut_originCut-pyltp_5006.txt",'w','utf-8')
+outputname="entityOutPut_originCut-pyltp_5006"
+fout=codecs.open(outputname+".txt",'w','utf-8')
+fout_cache=codecs.open(outputname+"_datacache.txt",'w','utf-8')
 
 #加载TextRank
 trDemo = data.TextRank.TextRank()
@@ -103,6 +105,11 @@ for rawline in f.readlines():
     rawline_json=json.loads(rawline)
     # 获取标题行
     titleline=rawline_json['title']
+    # 获取实体
+    entity=set()
+    eec=rawline_json["coreEntityEmotions"]
+    for key in eec:
+        entity.add(key["entity"])
     # 获取标题分词
     titleWords=segmentor.segment(titleline)
     # 创建标题集合（不重集合）
@@ -230,6 +237,24 @@ for rawline in f.readlines():
         totalScore[k] = rank['tfidf'] * standardTfidf[k] + rank['tr']  * tr + rank['it']  * inTitleRank + rank['pos']  * partOfSpeechRank
     # 对总分排序
     sortedScore = sorted(totalScore.items(), key=lambda x: x[1], reverse=True)
+
+    #缓存数据
+    cachesz=10
+    for p in range(cachesz):
+        cache_line=""
+        if p >=wordNum:
+            cacheline="0 0 0 0 0 0 0\n"
+        else:
+            is_et=0
+            word = (str)(sortedScore[p][0])
+            if word in entity:
+                is_et=1
+
+            cache_line =str(lineWordsDic[word]) + " " + str(idfDict[word])+" "+str(standardTfidf[word])+" "+str(trDict[word])+" "+str(itlDict[word])+" "+str(posDict[word])+" "+str(is_et)+"\n"
+        fout_cache.write(cache_line)
+        fout_cache.flush()
+
+
 
     # 整理获取输出信息
     i=i+1
