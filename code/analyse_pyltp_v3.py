@@ -91,7 +91,7 @@ nerDict=loadPreTrainEntityDict('lexiconAndNerDictWithInfo.txt')
 f=codecs.open("coreEntityEmotion_train.txt",'r','utf-8')
 
 # 设置输出文件
-outputname="entityOutPut_originCut-pyltp_full"
+outputname="entityOutPut_originCut-pyltp_full_v2"
 fout=codecs.open(outputname+".txt",'w','utf-8')
 fout_cache=codecs.open(outputname+"_datacache.txt",'w','utf-8')
 
@@ -234,7 +234,7 @@ for rawline in f.readlines():
     for p in range(cachesz):
         cache_line=""
         if p >=wordNum:
-            cacheline="0 0 0 0 0 0 0\n"
+            cache_line="0 0 0 0 0 0 0\n"
         else:
             is_et=0
             word = (str)(sortedScore[p][0])
