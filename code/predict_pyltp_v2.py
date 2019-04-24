@@ -6,32 +6,23 @@ import math
 import pyltp
 import os
 from pyltp import Segmentor
-import TextRank
+import data.TextRank
 
-'''
-请替换jieba的默认字典 可能需要删除cache
-请正确设置pyltp的分词模型
-请将pyltp的自定义字典 lexicon.txt 放在同目录下
-请将部分词性字典 spdict.txt放在同目录下
-请将IDF字典 ReducedIdfDict_test1.txt 放在同目录下
-
-注意 textrank部分未定型
-kickout为剔除非法标点 但是这可能导致实体漏识别
-inTitleRank 采用tanh(ax)函数将[0,inf]映射到[0,1] a为可调参数
-'''
 # 定义映射函数
 def sigmoid(x):
     x=float(x)
     y = 1 / (1 + math.exp((-x)))
     return y
+
 # 加载并设置pyltp
 LTP_DATA_DIR='D:\Souhu\ltp_data_v3.4.0\ltp_data_v3.4.0'
 cws_model_path=os.path.join(LTP_DATA_DIR,'cws.model')
 segmentor=Segmentor()
 # segmentor.load(cws_model_path)
 segmentor.load_with_lexicon(cws_model_path, 'ExDictForCut_without_JiebaDefault.txt')
+
 # 评价分数的比例
-rank={'tfidf':0.4,'tr':0.25,'it':0.2,'pos':0.15}
+rank={'tfidf':0.35,'tr':0.05,'it':0.25,'pos':0.35}
 
 # 加载用户词典
 # jieba.load_userdict("ReducedDict_test3.txt")
@@ -87,43 +78,42 @@ nerInPyltp=  loadNerDictFromPyltp('pyltp_savebox.txt')
 partOfSpeechDict=loadWordsPartOfSpeech("spdict.txt")
 nerDict=loadPreTrainEntityDict('lexiconAndNerDictWithInfo.txt')
 
+
+
 # 打开训练数据集
-f=codecs.open("coreEntityEmotion_train.txt",'r','utf-8')
+f=codecs.open("coreEntityEmotion_test_stage1.txt",'r','utf-8')
 
 # 设置输出文件
-outputname="entityOutPut_originCut-pyltp_full_v3"
-fout=codecs.open(outputname+".txt",'w','utf-8')
-fout_cache=codecs.open(outputname+"_datacache.txt",'w','utf-8')
+fout=codecs.open("predict_test3_pyltp_v3_6.txt",'w','utf-8')
 
 #加载TextRank
-trDemo = TextRank.TextRank()
+trDemo = data.TextRank.TextRank()
 
 # 分析过程
+print ('Start Calculating Score.')
 i = 0
 for rawline in f.readlines():
     # 按行分析
     rawline_json=json.loads(rawline)
     # 获取标题行
     titleline=rawline_json['title']
-    # 获取实体
-    entity=set()
-    eec=rawline_json["coreEntityEmotions"]
-    for key in eec:
-        entity.add(key["entity"])
     # 获取标题分词
     titleWords=segmentor.segment(titleline)
     # 创建标题集合（不重集合）
     titleWordsSet = (set)([])
     # 标题行输出
-    titleCut = "TitleCut="
+    # titleCut = "TitleCut="
     for w in titleWords:
-        # 读入长度大于1的词
+        flag=0
         for sep in kickout:
             if sep in w:
-                continue
-        if len((str)(w))>1 :
+                flag=1
+        if flag==1:
+            continue
+        # 读入长度大于1的词
+        if len((str)(w))>1:
             titleWordsSet.add(w)
-            titleCut+=w+" "
+            # titleCut+=w+" "
     # 获取内容行
     SC=rawline_json["content"].strip()
     content=rawline_json["title"].strip()+' '+rawline_json["content"].strip()
@@ -133,11 +123,11 @@ for rawline in f.readlines():
     lineWordsDic = {}
     # 分词
     words = segmentor.segment(content)
-    wordsForTR=list(words)
+    wordsForTR = list(words)
     # 总词数
     wordNum = 0
     # 创建内容分词输出行
-    contentCut = "Content = "
+    # contentCut = "Content = "
     # 统计词频 TF
     for w in words:
         flag=0
@@ -148,7 +138,7 @@ for rawline in f.readlines():
             continue
         if len(w)<=1:
             continue
-        contentCut=contentCut+w+" "
+        # contentCut=contentCut+w+" "
         if w in lineWordsDic:
             lineWordsDic[w]+=1
         else:
@@ -166,15 +156,7 @@ for rawline in f.readlines():
                 idfDict[w] = idf = 6
         tfidf[w]=(lineWordsDic[w]/wordNum)*idf  #MJ：wordNum不用除吧，每个词同除一个整数？idf下次来看看你怎么统计的。P
     # TextRank评分
-    """
-    这里默认已经修改过jieba的TextRank方法（未完成）或者重写。如果使用的是原始的jieba.textrank 请将alreadyCutted参数删除
-    """
-
-    textRank = trDemo.standardScoreTextrank(wordsForTR)
-    if wordNum>len(textRank):
-        wordNum=len(textRank)
-    # textRank = trdemo.textrank(wordsForTR, topK=wordNum, withWeight=True,allowPOS=('ns', 'n', 'nr','nt','nz','vn', 'v'),alreadyCutted=True)   #MJ:topK,allowPOS,span这几个参数有优化的空间。建议把各个模块独立出来，调用函数。比如我想快速迭代几轮，那么可以选择先不运行textrank的模块。之后组织代码的时候可以考虑一下后续的变动问题。
-    # 创建TR评分词典
+    textRank = trDemo.standardScoreTextrank(wordsForTR)    # 创建TR评分词典
     trDict = {}
     for l in textRank:
         trDict[l[0]]=l[1]
@@ -194,6 +176,8 @@ for rawline in f.readlines():
     # 创建总分词典
     totalScore = {}
     # 评分并记录
+    # 附加判断
+    addition=0
     for k in tfidf:
         partOfSpeechRank = 0
         inTitleRank = 0
@@ -228,51 +212,43 @@ for rawline in f.readlines():
         totalScore[k] = rank['tfidf'] * standardTfidf[k] + rank['tr']  * tr + rank['it']  * inTitleRank + rank['pos']  * partOfSpeechRank
     # 对总分排序
     sortedScore = sorted(totalScore.items(), key=lambda x: x[1], reverse=True)
-
-    #缓存数据
-    cachesz=20
-    for p in range(cachesz):
-        cache_line=""
-        if p >=wordNum:
-            cache_line="0 0 0 0 0 0 0\n"
-        else:
-            is_et=0
-            word = (str)(sortedScore[p][0])
-            if word in entity:
-                is_et=1
-
-            # cache_line =str(lineWordsDic[word]) + " " + str(idfDict[word])+" "+str(standardTfidf[word])+" "+str(trDict[word])+" "+str(itlDict[word])+" "+str(posDict[word])+" "+str(is_et)+"\n"
-            cache_line=word+" "+str(standardTfidf[word])+" "
-            cache_line+=str(trDict[word])+" "
-            cache_line+=str(itlDict[word])+" "
-            cache_line+=str(posDict[word])+" "
-            cache_line+=str(is_et)+"\n"
-        fout_cache.write(cache_line)
-        fout_cache.flush()
-
-
+    entityNum=len(list(sortedScore))
 
     # 整理获取输出信息
     i=i+1
     # 输出编号信息
-    outPutLine="No= "+(str)(i)+"\t" +"NewsId= "+rawline_json["newsId"]+"\tTotalWordsNum= "+(str)(wordNum)+"\n"
-    # 输出可能的实体信息
-    sz=20
-    if wordNum<sz:
-        sz=wordNum
-    for p in range(sz):
-        key=sortedScore[p][0]
-        wl="("+(str)(sortedScore[p][0])+" TotalScore= " +(str)(sortedScore[p][1])+" TfidfScore= "+(str)(standardTfidf[key])+" TextRankScore= "+(str)(trDict[key])+" InTitleScore= "+(str)(itlDict[key])+" PartOFSPeechScore= "+(str)(posDict[key])+")\t"
-        outPutLine+=wl
-    outPutLine+="\n"
-    # 输出标题行
-    outPutLine+="title = "+titleline+"\t"
-    # 输出标题分词
-    outPutLine+="titlecut= "+titleCut+"\n"
-    # 输出原文分词
-    outPutLine+=contentCut+"\n"
-    # 输出原文      #MJ：原文和分词最好对调一下，分词处于承上启下的位置。P
-    outPutLine+=SC+"\n"
+    # outPutLine="No= "+(str)(i)+"\t" +"NewsId= "+rawline_json["newsId"]+"\tTotalWordsNum= "+(str)(wordNum)+"\n"
+    # # 输出可能的实体信息
+    # sz=20
+    # if wordNum<sz:
+    #     sz=wordNum
+    # for p in range(sz):
+    #     key=sortedScore[p][0]
+    #     wl="("+(str)(sortedScore[p][0])+" TotalScore= " +(str)(sortedScore[p][1])+" TfidfScore= "+(str)(standardTfidf[key])+" TextRankScore= "+(str)(trDict[key])+" InTitleScore= "+(str)(itlDict[key])+" PartOFSPeechScore= "+(str)(posDict[key])+")\t"
+    #     outPutLine+=wl
+    # outPutLine+="\n"
+    # # 输出标题行
+    # outPutLine+="title = "+titleline+"\t"
+    # # 输出标题分词
+    # outPutLine+="titlecut= "+titleCut+"\n"
+    # # 输出原文分词
+    # outPutLine+=contentCut+"\n"
+    # # 输出原文      #MJ：原文和分词最好对调一下，分词处于承上启下的位置。P
+    # outPutLine+=SC+"\n"
+    if entityNum<3:
+        outPutLine = rawline_json["newsId"] + "\t"
+        for pp in range(entityNum):
+            outPutLine+=(str)(sortedScore[pp][0])
+            if pp<entityNum-1:
+                outPutLine += ","
+        outPutLine+="\t"
+        for pp in range(entityNum):
+            outPutLine+="POS"
+            if pp<entityNum-1:
+                outPutLine += ","
+        outPutLine+="\n"
+    else:
+        outPutLine=rawline_json["newsId"]+"\t"+(str)(sortedScore[0][0])+","+(str)(sortedScore[1][0])+","+(str)(sortedScore[2][0])+"\tPOS,POS,POS\n"
 
 
     # 监视
@@ -281,9 +257,7 @@ for rawline in f.readlines():
     fout.write(outPutLine)
     fout.flush()
 
-    # 条件
-    # if i==100:
-    #     break
+
 
 
 

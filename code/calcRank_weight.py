@@ -2,10 +2,10 @@ import codecs
 import json
 
 train_name="coreEntityEmotion_train.txt"
-res_name="entityOutPut_originCut-pyltp_full_v2_datacache.txt"
+res_name="entityOutPut_originCut-pyltp_full_v3_datacache.txt"
 
-output_name="rankweight_v1.txt"
-keywords_perNews=10
+output_name="rankweight_v2.txt"
+keywords_perNews=20
 list_train=codecs.open(train_name,'r','utf-8').readlines()
 list_res=fr=codecs.open(res_name,'r','utf-8').readlines()
 fout=codecs.open(output_name,'w','utf-8')
